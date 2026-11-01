@@ -135,14 +135,37 @@ interval of the mean (t distribution), CV, mean ± SD of d, mean aspect, number 
 φ. YarnHair takes the mean φ of a label with **Use φ of the selected label in YarnHair**
 (at least 3 sections); its source is written to the settings sheet of the results.
 
-**Outline suggestion.** Optional starting point: Gaussian smoothing (σ = 1.5 px), Otsu
-threshold, both polarities tried; closing with a disk of 6 % of the expected diameter
-(theoretical diameter at φ = 0.32 from count and blend), hole filling, opening with half
-that radius (morphology by Euclidean distance transform); the compact region (solidity
-≥ 0.7) not touching the border whose area is closest to the expected area (0.2–5×) is
-taken; its contour is resampled to 48 points equally spaced along it (a circle comes out
-0.3 % small). Images larger than 1600 px are reduced by block averaging for this step. The measurement is always the
-outline the user accepts.
+**Outline suggestion.** Made when an image without an outline is opened (and with
+**Suggest outline**). Images larger than 1000 px are reduced by block averaging for this
+step. Foreground masks, in order of preference: (1) fibre edges, for bright-field sections
+in which fibres and medium have about the same grey level: Sobel gradient magnitude of the
+image smoothed with σ = 1 px, smoothed again with σ = 1.5 % of the expected diameter,
+above its Otsu threshold; (2) grey level, for fluorescence, dark-field or stained
+sections: Otsu threshold of the image smoothed with σ = 1.5 px, both polarities. Each
+mask is closed with a disk of 6 % of the expected diameter (theoretical diameter at
+φ = 0.32 from count and blend), holes are filled and it is opened with half that radius
+(morphology by Euclidean distance transform). Candidates are compact regions (solidity
+≥ 0.7) not touching the border with 0.2–5 times the expected area; the largest candidate of
+the edge mask is taken, else the largest of the grey-level masks. The expected diameter
+sets only the scale and this range: the region is not chosen by closeness to the expected
+area, so the suggestion is not pulled towards φ = 0.32. The region is smoothed (Gaussian,
+σ = closing radius) and its contour resampled to 48 points equally spaced along it.
+
+**Outline status.** Each section records where its outline came from: *suggested* (not
+confirmed; listed but left out of the mean), *accepted* (suggestion confirmed unchanged),
+*edited* (suggestion with points moved, added or removed) or *manual* (drawn by hand).
+There is no "accept all": every suggestion is looked at. The summary per label gives the
+number of unconfirmed suggestions and of accepted, edited and hand-drawn outlines; the
+results file has the status of every section. Outline files written without statuses are
+read as hand-drawn.
+
+**Trial on real sections.** 14 bright-field sections in Eurelon 950 wax (30 µm, earlier
+study; yarn area marked by an operator with a circle): by eye, the suggestion followed the
+compact body on 5 sections of a cotton/elastane core-spun yarn (area 0.84–1.05 × the
+circle), took in sheared fibres on one side on 4 cotton sections (1.12–1.31 × on three,
+0.81 × on one) and found nothing (2) or an irregular part of the body (3) on 5 loosely
+packed dual-core sections. A threshold on grey level alone found an outline on 1 of the 14,
+hence the edge mask.
 
 **Files.** Outlines, yarns (count, blend, density) and pixel size are saved as JSON with
 image paths relative to the file; after the first save every change is written to the
