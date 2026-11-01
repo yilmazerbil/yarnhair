@@ -2,6 +2,7 @@
 
   yarnhair measure IMAGE [IMAGE ...] --diameter-um 242 --out results.tsv
   yarnhair diameter --ne 14 --density 1.52
+  yarnhair section outlines.json --out sections.tsv
   yarnhair --lang tr measure ...
 """
 import argparse
@@ -88,13 +89,39 @@ def _defaults(a, lang):
     return 0
 
 
+def _section(a, lang):
+    from .section import load_outlines, evaluate, section_table, summary_table
+    try:
+        pr = load_outlines(a.outlines)
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        print(t("section_error", lang, err=e), file=sys.stderr)
+        return 2
+    if not pr.get("pixel_um"):
+        print(t("section_no_pixel", lang), file=sys.stderr)
+        return 2
+    rows, summary = evaluate(pr)
+
+    def f(x):
+        return f"{x:.4f}" if isinstance(x, float) else str(x)
+
+    if a.out:
+        with open(a.out, "w", newline="", encoding="utf-8") as fh:
+            w = csv.writer(fh, delimiter="\t")
+            for row in section_table(rows):
+                w.writerow([f(x) for x in row])
+    for row in summary_table(summary):
+        print("\t".join(f(x) for x in row))
+    return 0
+
+
 def build_parser(lang):
     install_argparse_translation(lang)
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--lang", choices=LANGS, default=lang, help=t("lang_help", lang))
     p = argparse.ArgumentParser(prog="yarnhair", description=t("description", lang), parents=[common])
     p.add_argument("--version", action="version", version=__version__)
-    sub = p.add_subparsers(dest="cmd", required=True, title=t("commands", lang), metavar="{measure,diameter,defaults}")
+    sub = p.add_subparsers(dest="cmd", required=True, title=t("commands", lang),
+                           metavar="{measure,diameter,section,defaults}")
 
     m = sub.add_parser("measure", parents=[common], help=t("measure_help", lang), description=t("measure_help", lang))
     m.add_argument("images", nargs="+", metavar=t("mv_image", lang), help=t("images_help", lang))
@@ -117,6 +144,11 @@ def build_parser(lang):
     r.add_argument("--blend", metavar=t("mv_blend", lang), help=t("blend_help", lang))
     d.add_argument("--packing", type=float, default=DEFAULT_PACKING, metavar=t("mv_fraction", lang), help=t("packing_help", lang))
     d.set_defaults(func=_diameter)
+
+    s = sub.add_parser("section", parents=[common], help=t("section_help", lang), description=t("section_help", lang))
+    s.add_argument("outlines", metavar=t("mv_file", lang), help=t("outlines_help", lang))
+    s.add_argument("--out", default="", metavar=t("mv_file", lang), help=t("section_out_help", lang))
+    s.set_defaults(func=_section)
 
     c = sub.add_parser("defaults", parents=[common], help=t("defaults_help", lang), description=t("defaults_help", lang))
     c.set_defaults(func=_defaults)

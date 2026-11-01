@@ -106,6 +106,26 @@ MESSAGES = {
         "en": "{n} frame(s) could not be processed",
         "tr": "{n} kare işlenemedi",
     },
+    "section_help": {
+        "en": "packing density from yarn cross-sections: recalculate an outline file saved by YarnSection",
+        "tr": "iplik kesitlerinden paketleme yoğunluğu: YarnSection'ın kaydettiği sınır dosyasını yeniden hesapla",
+    },
+    "outlines_help": {
+        "en": "outline file (.json) saved by YarnSection or by YarnHair's cross-section window",
+        "tr": "YarnSection'ın ya da YarnHair kesit penceresinin kaydettiği sınır dosyası (.json)",
+    },
+    "section_out_help": {
+        "en": "also write the values of every section to this tab-separated file",
+        "tr": "her kesitin değerlerini ayrıca bu sekmeyle ayrılmış dosyaya yaz",
+    },
+    "section_error": {
+        "en": "the outline file could not be read: {err}",
+        "tr": "sınır dosyası okunamadı: {err}",
+    },
+    "section_no_pixel": {
+        "en": "the outline file has no pixel size",
+        "tr": "sınır dosyasında piksel boyutu yok",
+    },
     # placeholders shown in the help text
     "mv_file": {"en": "FILE", "tr": "DOSYA"},
     "mv_label": {"en": "LABEL", "tr": "ETİKET"},
