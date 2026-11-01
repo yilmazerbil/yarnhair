@@ -1,0 +1,62 @@
+# Builds the double-click programs for macOS and Windows.
+# Runs by hand (Actions -> build-apps -> Run workflow) and for every pushed tag v*;
+# for a tag the zip files are attached to the release of that tag.
+name: build-apps
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: macos-14, name: macOS-AppleSilicon}
+          - {os: macos-15-intel, name: macOS-Intel}
+          - {os: windows-latest, name: Windows}
+    runs-on: ${{ matrix.os }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r packaging/requirements-app.txt
+          python -m pip install . --no-deps
+      - name: Tests
+        run: python -m pytest -q
+      - name: Build
+        working-directory: packaging
+        run: pyinstaller YarnHair.spec --noconfirm --distpath ../dist --workpath ../build
+      - name: Self-test of the built program (macOS)
+        if: runner.os == 'macOS'
+        run: dist/YarnHair.app/Contents/MacOS/YarnHair --selftest
+      - name: Self-test of the built program (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist\YarnHair\YarnHair.exe -ArgumentList "--selftest" -Wait -PassThru
+          exit $p.ExitCode
+      - name: Zip (macOS)
+        if: runner.os == 'macOS'
+        run: ditto -c -k --keepParent dist/YarnHair.app YarnHair-${{ matrix.name }}.zip
+      - name: Zip (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist\YarnHair -DestinationPath YarnHair-${{ matrix.name }}.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YarnHair-${{ matrix.name }}
+          path: YarnHair-${{ matrix.name }}.zip
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: YarnHair-${{ matrix.name }}.zip
