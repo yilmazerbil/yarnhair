@@ -38,6 +38,7 @@ class OutlineView(QGraphicsView):
         self._drag = None          # index of the point being dragged
         self._pan = None
         self.editable = True
+        self.last_action = "edit"     # "undo" while outlineChanged is emitted by undo()
 
     # ---------------------------------------------------------------- image
     def set_image(self, path, points=None):
@@ -76,6 +77,7 @@ class OutlineView(QGraphicsView):
         if self._history:
             self._pts = self._history.pop()
             self._redraw()
+            self.last_action = "undo"
             self.outlineChanged.emit(self.points())
 
     def remove_last(self):
@@ -86,6 +88,7 @@ class OutlineView(QGraphicsView):
             self.outlineChanged.emit(self.points())
 
     def _push(self):
+        self.last_action = "edit"
         self._history.append([QPointF(p) for p in self._pts])
         del self._history[:-200]
 

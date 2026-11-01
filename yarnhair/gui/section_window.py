@@ -28,6 +28,8 @@ from .texts import tr, fmt
 IMG_EXT = (".bmp", ".png", ".tif", ".tiff", ".jpg", ".jpeg")
 RED = "#c62828"
 ORANGE = "#c2410c"
+GREEN = "#2e7d32"
+STATUS_COLOUR = {"suggested": ORANGE, "accepted": GREEN, "edited": GREEN, "manual": GREEN, "": "gray"}
 
 
 def _num(value, nd, lang):
@@ -66,6 +68,9 @@ class SectionWindow(QMainWindow):
         self.dirty = False
         self.rows, self.summary = [], {}
         self._gray = (None, None)              # (path, array) for the outline suggestion
+        self._applying = False                 # True while a suggestion is put on the view
+        self._tried = set()                    # sections where the automatic suggestion found nothing
+        self._status_hist = []                 # status before each change of the current outline (for undo)
         self.resize(1450, 920)
         self.build_ui()
 
@@ -104,6 +109,7 @@ class SectionWindow(QMainWindow):
         self.setCentralWidget(split)
         self._building = False
         self.refresh_all()
+        self.update_status_ui()
         if self.project["sections"]:
             self.select(min(max(self.current, 0), len(self.project["sections"]) - 1))
 
@@ -155,9 +161,9 @@ class SectionWindow(QMainWindow):
             b.clicked.connect(fn)
             row.addWidget(b)
         v.addLayout(row)
-        self.img_table = QTableWidget(0, 4)
+        self.img_table = QTableWidget(0, 5)
         self.img_table.setHorizontalHeaderLabels([self.t("col_label"), self.t("col_file"), self.t("s_col_phi"),
-                                                  self.t("s_col_use")])
+                                                  self.t("s_col_use"), self.t("s_col_status")])
         hh = self.img_table.horizontalHeader()
         hh.setSectionResizeMode(QHeaderView.ResizeToContents)
         hh.setSectionResizeMode(1, QHeaderView.Stretch)
@@ -233,6 +239,18 @@ class SectionWindow(QMainWindow):
         row.addWidget(self.use_box)
         row.addStretch(1)
         v.addLayout(row)
+        row = QHBoxLayout()
+        self.status_label = QLabel("")
+        row.addWidget(self.status_label)
+        self.accept_btn = QPushButton(self.t("s_btn_accept"))
+        self.accept_btn.setStyleSheet("font-weight: bold")
+        self.accept_btn.clicked.connect(self.accept_suggestion)
+        row.addWidget(self.accept_btn)
+        self.draw_btn = QPushButton(self.t("s_btn_draw"))
+        self.draw_btn.clicked.connect(self.draw_myself)
+        row.addWidget(self.draw_btn)
+        row.addStretch(1)
+        v.addLayout(row)
         self.view = OutlineView()
         self.view.outlineChanged.connect(self.outline_changed)
         v.addWidget(self.view, 1)
@@ -247,10 +265,10 @@ class SectionWindow(QMainWindow):
 
     def build_tabs(self):
         tabs = QTabWidget()
-        self.sec_table = QTableWidget(0, 12)
+        self.sec_table = QTableWidget(0, 13)
         self.sec_table.setHorizontalHeaderLabels([self.t(k) for k in (
             "h_label", "h_image", "h_pts", "h_area", "h_deq", "h_major", "h_minor", "h_aspect", "s_col_phi", "h_phim",
-            "h_use", "h_note")])
+            "h_use", "h_status", "h_note")])
         self.sec_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.sec_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.sec_table.cellDoubleClicked.connect(lambda r, _c: self.select(r))
@@ -261,9 +279,10 @@ class SectionWindow(QMainWindow):
         note.setWordWrap(True)
         note.setStyleSheet("color: gray")
         v.addWidget(note)
-        self.sum_table = QTableWidget(0, 9)
+        self.sum_table = QTableWidget(0, 11)
         self.sum_table.setHorizontalHeaderLabels([self.t(k) for k in (
-            "h_label", "h_nsec", "h_phi_mean", "h_ci", "h_cv", "h_deq_mean", "h_aspect", "h_flagged", "h_dth")])
+            "h_label", "h_nsec", "h_phi_mean", "h_ci", "h_cv", "h_deq_mean", "h_aspect", "h_flagged", "h_dth",
+            "h_pending", "h_origin")])
         self.sum_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.sum_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.sum_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
@@ -319,7 +338,7 @@ class SectionWindow(QMainWindow):
             return
         first = len(self.project["sections"])
         for lab, f in items:
-            self.project["sections"].append(dict(label=lab, image=f, outline=[], use=True))
+            self.project["sections"].append(dict(label=lab, image=f, outline=[], use=True, status=""))
         self.ensure_yarns()
         self.mark_changed()
         self.refresh_all()
@@ -341,6 +360,7 @@ class SectionWindow(QMainWindow):
         self.project["sections"] = []
         self.current = -1
         self.view.clear()
+        self.update_status_ui()
         self.mark_changed()
         self.refresh_all()
 
@@ -380,10 +400,12 @@ class SectionWindow(QMainWindow):
             self.current = -1
             self.view.clear()
             self.update_live()
+            self.update_status_ui()
             return
         i = min(max(i, 0), len(secs) - 1)
         self.current = i
         s = secs[i]
+        self._status_hist = []                     # the view starts a new undo history
         self.message.setText("")
         if os.path.exists(s["image"]):
             self.view.set_image(s["image"], s.get("outline", []))
@@ -398,20 +420,72 @@ class SectionWindow(QMainWindow):
             t.blockSignals(True)
             t.setCurrentCell(i, 1)
             t.blockSignals(False)
+        if (len(s.get("outline", [])) < 3 and not s.get("status") and id(s) not in self._tried
+                and os.path.exists(s["image"])):
+            self.suggest(auto=True)                # the user accepts it, corrects it or draws one
         self.update_live()
+        self.update_status_ui()
 
     # ------------------------------------------------------------- outline
     def outline_changed(self, pts):
         if self.current < 0:
             return
-        self.project["sections"][self.current]["outline"] = [(float(x), float(y)) for x, y in pts]
+        s = self.project["sections"][self.current]
+        same = [tuple(p) for p in s.get("outline", [])] == [(float(x), float(y)) for x, y in pts]
+        s["outline"] = [(float(x), float(y)) for x, y in pts]
+        prev = s.get("status", "")
+        if self.view.last_action == "undo" and not self._applying:
+            st = self._status_hist.pop() if self._status_hist else prev
+            s["status"] = st if (pts and st) else "manual"
+        else:
+            self._status_hist.append(prev)
+            del self._status_hist[:-200]
+            if self._applying:
+                s["status"] = "suggested"
+            elif same:
+                pass                               # e.g. a point clicked but not moved
+            elif not pts:
+                s["status"] = "manual"             # cleared by the user: no new automatic suggestion
+            elif prev in ("suggested", "accepted", "edited"):
+                s["status"] = "edited"
+            else:
+                s["status"] = "manual"
         self.mark_changed()
         self.refresh_values()
         self.update_live()
+        self.update_status_ui()
 
     def clear_outline(self):
         if self.current >= 0:
             self.view.set_points([])
+
+    def accept_suggestion(self):
+        if self.current < 0:
+            return
+        s = self.project["sections"][self.current]
+        if s.get("status") != "suggested" or len(s.get("outline", [])) < 3:
+            return
+        s["status"] = "accepted"
+        self.message.setText(self.t("s_accepted"))
+        self.mark_changed()
+        self.refresh_values()
+        self.update_status_ui()
+
+    def draw_myself(self):
+        if self.current < 0:
+            return
+        self.view.set_points([])                   # status becomes "manual"; Ctrl+Z brings the suggestion back
+        self.message.setText(self.t("s_draw_hint"))
+        self.view.setFocus()
+
+    def update_status_ui(self):
+        st = ""
+        if 0 <= self.current < len(self.project["sections"]):
+            st = self.project["sections"][self.current].get("status", "")
+        self.status_label.setText(self.t("st_" + (st or "none")))
+        self.status_label.setStyleSheet(f"color: {STATUS_COLOUR.get(st, 'gray')}; font-weight: bold")
+        self.accept_btn.setEnabled(st == "suggested")
+        self.draw_btn.setEnabled(st == "suggested")
 
     def use_toggled(self, on):
         if self.current < 0:
@@ -432,7 +506,9 @@ class SectionWindow(QMainWindow):
             return None
         return theoretical_diameter_um(y["tex"], y["rho"], DEFAULT_PACKING) / px
 
-    def suggest(self):
+    def suggest(self, auto=False):
+        """Put a suggested outline on the current section (status "suggested").
+        auto=True: called when a section without outline is opened."""
         if self.current < 0:
             return
         s = self.project["sections"][self.current]
@@ -441,16 +517,25 @@ class SectionWindow(QMainWindow):
         import numpy as np
         from PIL import Image
         if self._gray[0] != s["image"]:
-            self._gray = (s["image"], np.asarray(Image.open(s["image"]).convert("L"), dtype=float))
+            try:
+                self._gray = (s["image"], np.asarray(Image.open(s["image"]).convert("L"), dtype=float))
+            except OSError:
+                return
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
             pts = suggest_outline(self._gray[1], self.expected_diameter_px(s["label"]))
         finally:
             QApplication.restoreOverrideCursor()
         if pts is None:
+            if auto:
+                self._tried.add(id(s))
             self.message.setText(self.t("s_suggest_none"))
         else:
-            self.view.set_points(pts)
+            self._applying = True
+            try:
+                self.view.set_points(pts)
+            finally:
+                self._applying = False
             self.message.setText(self.t("s_suggest_done"))
 
     def update_live(self):
@@ -554,7 +639,15 @@ class SectionWindow(QMainWindow):
             u.setFlags((u.flags() | Qt.ItemIsUserCheckable) & ~Qt.ItemIsEditable)
             u.setCheckState(Qt.Checked if s.get("use", True) else Qt.Unchecked)
             t.setItem(i, 3, u)
+            t.setItem(i, 4, self._status_item(s))
         self._building = False
+
+    def _status_item(self, s):
+        st = s.get("status", "")
+        it = _text(self.t("st_" + (st or "none")))
+        if st == "suggested":
+            it.setForeground(Qt.darkYellow)
+        return it
 
     def refresh_yarns(self):
         lang = self.lang
@@ -596,11 +689,16 @@ class SectionWindow(QMainWindow):
                                           ("aspect", 2), ("phi", 3), ("phi_minor", 3))):
                 st.setItem(i, 3 + j, _num(v.get(k), nd, lang))
             st.setItem(i, 10, _text("✓" if s.get("use", True) else "–"))
-            note = self.t("s_err_cross") if err else (
-                self.t("note_aspect", lim=fmt(ASPECT_LIMIT, 1, lang)) if v.get("flag") else "")
-            st.setItem(i, 11, _text(note))
+            st.setItem(i, 11, self._status_item(s))
+            notes = [self.t("s_err_cross")] if err else []
+            if v.get("flag"):
+                notes.append(self.t("note_aspect", lim=fmt(ASPECT_LIMIT, 1, lang)))
+            if v.get("pending"):
+                notes.append(self.t("note_pending"))
+            st.setItem(i, 12, _text(" · ".join(notes)))
             if i < it_t.rowCount():
                 it_t.setItem(i, 2, _num(v.get("phi"), 3, lang))
+                it_t.setItem(i, 4, self._status_item(s))
         self._building = False
         sm = self.sum_table
         sm.setRowCount(len(self.summary))
@@ -618,7 +716,13 @@ class SectionWindow(QMainWindow):
             sm.setItem(i, 6, _num(d["aspect_mean"], 2, lang))
             sm.setItem(i, 7, _num(d["n_flagged"], 0, lang))
             sm.setItem(i, 8, _num(d["d_theoretical"], 1, lang))
-        self.statusBar().showMessage(self.t("s_status", n=len(self.project["sections"]), m=n_out))
+            pend = _num(d["n_pending"], 0, lang)
+            if d["n_pending"]:
+                pend.setForeground(Qt.darkYellow)
+            sm.setItem(i, 9, pend)
+            sm.setItem(i, 10, _text(f"{d['n_accepted']} / {d['n_edited']} / {d['n_manual']}"))
+        n_pend = sum(1 for s in self.project["sections"] if s.get("status") == "suggested")
+        self.statusBar().showMessage(self.t("s_status", n=len(self.project["sections"]), m=n_out, p=n_pend))
 
     # -------------------------------------------------------------- saving
     def mark_changed(self):
@@ -658,6 +762,7 @@ class SectionWindow(QMainWindow):
             return False
         self.project = pr
         self.project.setdefault("pixel_how", "")
+        self._tried = set()
         self.outline_file, self.dirty = f, False
         self.current = 0
         self.build_ui()
@@ -707,6 +812,7 @@ class SectionWindow(QMainWindow):
                     [self.t("set_pixel_how"), self.project.get("pixel_how") or self.t("pixel_manual")],
                     [self.t("set_method"), self.t("set_method_text")],
                     [self.t("set_aspect_limit"), ASPECT_LIMIT],
+                    [self.t("set_status"), self.t("set_status_text")],
                     ["outlines", self.outline_file or ""]]
         sheets.append((self.t("sheet_settings"), settings))
         ws = wb.active
@@ -749,6 +855,8 @@ class SectionWindow(QMainWindow):
                 txt += f"  phi = {v['phi']:.3f}"
             if not s.get("use", True):
                 txt += "  (not used)"
+            elif s.get("status") == "suggested":
+                txt += "  (suggestion not confirmed)"
             dr.text((10, 10), txt, fill=(255, 220, 0), font=font, stroke_width=2, stroke_fill=(0, 0, 0))
             base = os.path.splitext(os.path.basename(s["image"]))[0]
             name = f"{s['label']}_{base}".replace("/", "_") if s["label"] else base
@@ -788,7 +896,10 @@ class SectionWindow(QMainWindow):
             QMessageBox.information(self, "YarnSection", self.t("s_need_three"))
             return
         self.link.use_section_phi(d["phi_mean"], lab, d["n"], d["phi_sd"])
-        self.message.setText(self.t("s_used_phi", phi=fmt(d["phi_mean"], 3, self.lang), label=lab, n=d["n"]))
+        msg = self.t("s_used_phi", phi=fmt(d["phi_mean"], 3, self.lang), label=lab, n=d["n"])
+        if d["n_pending"]:
+            msg += self.t("s_pending_warn", n=d["n_pending"])
+        self.message.setText(msg)
 
     # -------------------------------------------------------------- dialogs
     def show_method(self):

@@ -224,9 +224,34 @@ T = {
     "s_btn_prev": ("◀ Previous", "◀ Önceki"),
     "s_btn_next": ("Next ▶", "Sonraki ▶"),
     "s_use": ("Use this section", "Bu kesiti kullan"),
-    "s_suggest_none": ("No outline found; draw it by hand.", "Sınır bulunamadı; elle çizin."),
-    "s_suggest_done": ("Suggested outline: check it and move the points where it does not follow the yarn body.",
-                       "Önerilen sınır: kontrol edin; gövdeyi izlemediği yerlerde noktaları taşıyın."),
+    "s_suggest_none": ("No outline could be suggested; draw it by hand.", "Sınır önerilemedi; elle çizin."),
+    "s_suggest_done": ("Suggested outline: check that it runs around the outermost fibres of the compact body. Accept "
+                       "it, move its points, or draw the outline yourself. A suggestion that is not confirmed is not "
+                       "used in the mean.",
+                       "Önerilen sınır: sıkı gövdenin en dıştaki liflerinin çevresinden geçip geçmediğine bakın. "
+                       "Kabul edin, noktalarını taşıyın ya da sınırı kendiniz çizin. Onaylanmayan öneri ortalamaya "
+                       "girmez."),
+    "s_btn_accept": ("Accept suggestion", "Öneriyi kabul et"),
+    "s_btn_draw": ("I will draw it", "Kendim çizeceğim"),
+    "s_accepted": ("Suggestion accepted.", "Öneri kabul edildi."),
+    "s_draw_hint": ("Draw the outline: click around the compact body. Ctrl+Z brings the suggestion back; "
+                    "Suggest outline makes a new one.",
+                    "Sınırı çizin: sıkı gövdenin çevresine tıklayın. Ctrl+Z öneriyi geri getirir; Sınır öner yeniden "
+                    "önerir."),
+    "st_none": ("No outline", "Sınır yok"),
+    "st_suggested": ("Suggested – not confirmed", "Önerildi – onaylanmadı"),
+    "st_accepted": ("Suggestion accepted", "Öneri kabul edildi"),
+    "st_edited": ("Suggestion corrected", "Öneri düzeltildi"),
+    "st_manual": ("Drawn by hand", "Elle çizildi"),
+    "s_col_status": ("Outline", "Sınır"),
+    "note_pending": ("not confirmed – not in the mean", "onaylanmadı – ortalamada yok"),
+    "s_pending_warn": (" {n} suggestion(s) of this label are not confirmed and are not in the mean.",
+                       " Bu etiketin {n} önerisi onaylanmadı, ortalamaya girmedi."),
+    "set_status": ("Outline status", "Sınır durumu"),
+    "set_status_text": ("suggested = automatic suggestion not confirmed (left out of the mean); accepted = suggestion "
+                        "confirmed unchanged; edited = suggestion corrected by the user; manual = drawn by hand",
+                        "suggested = onaylanmamış otomatik öneri (ortalamaya girmez); accepted = değiştirilmeden "
+                        "kabul edilen öneri; edited = kullanıcının düzelttiği öneri; manual = elle çizilen sınır"),
     "s_live": ("A = {a} µm² · d = {d} µm · aspect {asp}", "A = {a} µm² · d = {d} µm · en/boy {asp}"),
     "s_live_phi": (" · φ = {phi}", " · φ = {phi}"),
     "s_need_points": ("Outline: {n} point(s); at least 3 are needed.", "Sınır: {n} nokta; en az 3 gerekir."),
@@ -245,15 +270,19 @@ T = {
     "h_deq": ("d (µm)", "d (µm)"), "h_major": ("Long axis (µm)", "Uzun eksen (µm)"),
     "h_minor": ("Short axis (µm)", "Kısa eksen (µm)"), "h_aspect": ("Aspect", "En/boy"),
     "h_phim": ("φ (short axis)", "φ (kısa eksen)"), "h_use": ("Use", "Kullan"), "h_note": ("Note", "Not"),
+    "h_status": ("Outline", "Sınır"), "h_pending": ("Not confirmed", "Onay bekleyen"),
+    "h_origin": ("Accepted / corrected / drawn", "Kabul / düzeltilen / çizilen"),
     "h_nsec": ("Sections", "Kesit"), "h_phi_mean": ("φ mean ± SD", "φ ort. ± SS"),
     "h_ci": ("95 % CI of the mean", "Ortalamanın %95 GA'sı"), "h_cv": ("CV %", "DK %"),
     "h_deq_mean": ("d mean ± SD (µm)", "d ort. ± SS (µm)"), "h_flagged": ("Flagged", "İşaretli"),
     "h_dth": ("Diameter in YarnHair (µm)", "YarnHair'deki çap (µm)"),
     "note_aspect": ("aspect > {lim}", "en/boy > {lim}"),
-    "s_sum_note": ("Mean of the sections marked “Use”. The diameter is what YarnHair calculates from count, blend "
-                   "and the mean φ. Add sections if the confidence interval is wider than ±0.02.",
-                   "“Kullan” işaretli kesitlerin ortalaması. Çap, YarnHair'in numara, karışım ve ortalama φ'den "
-                   "hesapladığı değerdir. Güven aralığı ±0,02'den genişse kesit ekleyin."),
+    "s_sum_note": ("Mean of the sections marked “Use”; suggestions that are not confirmed are left out. The diameter "
+                   "is what YarnHair calculates from count, blend and the mean φ. Add sections if the confidence "
+                   "interval is wider than ±0.02.",
+                   "“Kullan” işaretli kesitlerin ortalaması; onaylanmamış öneriler dışarıda kalır. Çap, YarnHair'in "
+                   "numara, karışım ve ortalama φ'den hesapladığı değerdir. Güven aralığı ±0,02'den genişse kesit "
+                   "ekleyin."),
     "s_btn_use_phi": ("Use φ of the selected label in YarnHair", "Seçili etiketin φ'sini YarnHair'de kullan"),
     "s_need_three": ("At least 3 sections of this label are needed.", "Bu etiketten en az 3 kesit gerekir."),
     "s_used_phi": ("φ = {phi} ({label}, {n} sections) is now set in YarnHair.",
@@ -273,7 +302,8 @@ T = {
     "s_open_failed": ("The file could not be opened: {e}", "Dosya açılamadı: {e}"),
     "s_no_sections": ("No outlined section yet.", "Henüz sınırı çizilmiş kesit yok."),
     "s_checks_done": ("{n} checking image(s) saved in {p}", "{n} kontrol görüntüsü kaydedildi: {p}"),
-    "s_status": ("{n} image(s), {m} outlined", "{n} görüntü, {m} tanesinin sınırı çizildi"),
+    "s_status": ("{n} image(s), {m} with an outline, {p} not confirmed",
+                 "{n} görüntü, {m} tanesinde sınır var, {p} tanesi onay bekliyor"),
     "sheet_sections": ("Sections", "Kesitler"), "sheet_yarns": ("Yarns", "İplikler"),
     "set_method": ("Method", "Yöntem"),
     "set_method_text": ("φ = fibre area / area inside the outline; fibre area = 1000·T/ρ (µm², T in tex, ρ in g/cm³); "
@@ -299,8 +329,12 @@ T = {
         "elastane core-spun yarn bulks). Cut perpendicular to the yarn axis. A lost core (hole) does not matter: it "
         "lies inside the outline and its mass is in T. Take 15–20 sections per yarn from different places; the "
         "confidence interval of the mean is shown in the summary.</p>"
-        "<p><b>Suggest outline</b> thresholds the image, closes the gaps between fibres and takes the compact region "
-        "closest to the expected size. It is only a starting point: the measurement is the outline you accept.</p>",
+        "<p><b>Suggestion.</b> When an image without an outline is opened, an outline is suggested: the fibres are "
+        "found by their edges (or by their grey level), the gaps between them are closed and the largest compact "
+        "region is taken. Check it and choose <b>Accept suggestion</b>, move its points, or <b>I will draw it</b>. "
+        "A suggestion that is not confirmed is not used in the mean; the summary counts accepted, corrected and "
+        "hand-drawn outlines. The suggestion follows the compact body of well-cut sections; it takes in spread "
+        "fibres and fails on loosely packed or damaged sections, so look at every one.</p>",
         "<h3>Kesitlerden paketleme yoğunluğu</h3>"
         "<p>Her kesitte iplik gövdesinin sınırı çizilir: sıkı gövdeye hâlâ ait olan en dıştaki liflerin çevresinden; "
         "sapan ve yerinden oynamış lifler dışarıda kalır. İplik eksenine dik bir kesitteki lif alanı yalnız numara ve "
@@ -317,8 +351,12 @@ T = {
         "kabarır). İplik eksenine dik kesin. Özün düşmesi (boşluk) sorun değildir: sınırın içinde kalır ve kütlesi "
         "T'nin içindedir. İplik başına farklı yerlerden 15–20 kesit alın; ortalamanın güven aralığı özette "
         "gösterilir.</p>"
-        "<p><b>Sınır öner</b> görüntüyü eşikler, lifler arasındaki boşlukları kapatır ve beklenen boyuta en yakın sıkı "
-        "bölgeyi alır. Yalnız başlangıçtır: ölçüm, sizin kabul ettiğiniz sınırdır.</p>"),
+        "<p><b>Öneri.</b> Sınırı olmayan bir görüntü açılınca sınır önerilir: lifler kenarlarından (ya da gri "
+        "düzeylerinden) bulunur, aralarındaki boşluklar kapatılır ve en büyük sıkı bölge alınır. Bakın ve "
+        "<b>Öneriyi kabul et</b>'i seçin, noktalarını taşıyın ya da <b>Kendim çizeceğim</b>'i seçin. Onaylanmayan "
+        "öneri ortalamaya girmez; özet kabul edilen, düzeltilen ve elle çizilen sınırları sayar. Öneri iyi alınmış "
+        "kesitlerde sıkı gövdeyi izler; yayılmış lifleri içine alır, gevşek ya da bozuk kesitlerde bulamaz; bu "
+        "yüzden her birine bakın.</p>"),
     "s_about_text": ("<b>YarnSection {v}</b> (part of YarnHair)<br>Packing density of yarns from the outline of "
                      "cross-sections and the yarn count.<br><br>Licence: MIT. Please cite the software (CITATION.cff or "
                      "the Zenodo DOI of the release).<br><br>The code was written with the help of a large language "

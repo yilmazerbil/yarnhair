@@ -1,7 +1,8 @@
 """YarnSection: the cross-section window as a program of its own (``yarnsection``).
 
 ``yarnsection --selftest`` suggests and measures the outline of a synthetic
-section, opens the window off-screen and returns exit code 0 if this works.
+section, opens the window off-screen (where the suggestion appears on its own
+and is accepted) and returns exit code 0 if this works.
 """
 import math
 import os
@@ -31,10 +32,11 @@ def selftest():
         Image.fromarray(img.astype("uint8")).save(path)
         w = SectionWindow(lang="en")
         w.add_files([["test", path]])
-        if pts:
-            w.view.set_points(pts)
+        auto = w.project["sections"][0].get("status") == "suggested"
+        w.accept_suggestion()
         app.processEvents()
-        ok = ok and w.rows and w.rows[0][1] is not None
+        ok = ok and auto and w.project["sections"][0]["status"] == "accepted" and w.rows and w.rows[0][1] is not None
+        print("window: suggestion shown on opening and accepted" if ok else "window: suggestion FAILED")
         w.dirty = False
         w.close()
     print(f"YarnSection {__version__}")
