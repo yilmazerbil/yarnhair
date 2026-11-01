@@ -1,8 +1,9 @@
 """Self-test of an installed or frozen program: ``yarnhair-gui --selftest``.
 
 Measures a synthetic frame with six straight hairs in a separate process (as the
-program does), opens the main window off-screen and reports the result. Exit
-code 0 means the measurement libraries, the worker processes and Qt work.
+program does), opens the main window and the cross-section window off-screen
+and reports the result. Exit code 0 means the measurement libraries, the worker
+processes and Qt work.
 """
 import multiprocessing
 import os
@@ -54,7 +55,10 @@ def run():
     app = QApplication.instance() or QApplication(sys.argv[:1])
     w = MainWindow()
     w.show()
+    w.open_sections()                 # the cross-section window is part of the program
     app.processEvents()
+    ok = ok and w.section_win is not None and w.section_win.isVisible()
+    w.section_win.dirty = False
     w.close()
     import numpy, scipy, skimage
     print(f"YarnHair {__version__}; numpy {numpy.__version__}, scipy {scipy.__version__}, "

@@ -113,6 +113,9 @@ class MainWindow(QMainWindow):
         self.calib = None        # (um_per_px, length_um, pixels, file)
         self.tmpdir = tempfile.mkdtemp(prefix="yarnhair_")
         self.runner = None
+        self.section_win = None      # cross-section window (YarnSection)
+        self.phi_source = None       # text: where the packing density came from
+        self._phi_from_sections = False
         self.resize(1400, 900)
         self.build_ui()
 
@@ -176,6 +179,10 @@ class MainWindow(QMainWindow):
             a.triggered.connect(lambda _=False, c=code: self.set_language(c))
             grp.addAction(a)
             ml.addAction(a)
+        mt = mb.addMenu(self.t("menu_tools"))
+        a = QAction(self.t("act_sections"), self)
+        a.triggered.connect(self.open_sections)
+        mt.addAction(a)
         mh = mb.addMenu(self.t("menu_help"))
         for key, fn in (("act_refs", self.show_refs), ("act_fibres", self.show_fibres), ("act_about", self.show_about)):
             a = QAction(self.t(key), self)
@@ -303,20 +310,28 @@ class MainWindow(QMainWindow):
         self.phi.setSingleStep(0.01)
         self.phi.setValue(DEFAULT_PACKING)
         self.phi.valueChanged.connect(self.update_boundary)
+        self.phi.valueChanged.connect(self.phi_edited)
         h = QHBoxLayout()
         h.addWidget(self.phi)
         b = QPushButton(self.t("btn_refs"))
         b.clicked.connect(self.show_refs)
+        h.addWidget(b)
+        b = QPushButton(self.t("btn_from_sections"))
+        b.clicked.connect(self.open_sections)
         h.addWidget(b)
         h.addStretch(1)
         grid.addLayout(h, 0, 1)
         src = QLabel(self.t("packing_src"))
         src.setWordWrap(True)
         grid.addWidget(src, 1, 0, 1, 2)
+        self.phi_src_label = QLabel(self.phi_source or "")
+        self.phi_src_label.setWordWrap(True)
+        self.phi_src_label.setStyleSheet("color: #1b7f3b; font-weight: bold")
+        grid.addWidget(self.phi_src_label, 2, 0, 1, 2)
         self.theory_calc = QLabel("")
         self.theory_calc.setWordWrap(True)
         self.theory_calc.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        grid.addWidget(self.theory_calc, 2, 0, 1, 2)
+        grid.addWidget(self.theory_calc, 3, 0, 1, 2)
         v.addLayout(grid)
 
         v.addWidget(self.mode_measured)
@@ -829,6 +844,7 @@ class MainWindow(QMainWindow):
             (self.t("set_blend"), blend), (self.t("set_rho"), b["rho"]),
             (self.t("set_mode"), self.t("mode_theory") if b["theory"] else self.t("mode_measured")),
             (self.t("set_phi"), b["phi"]),
+            (self.t("set_phi_src"), (self.phi_source or self.t("phi_src_hand")) if b["theory"] else ""),
             (self.t("set_dtype"), "" if b["theory"] else self.dtype.currentText()),
             (self.t("set_d"), b["d"]),
             (self.t("set_config"), json.dumps(DEFAULT_CONFIG)),
@@ -1038,7 +1054,47 @@ class MainWindow(QMainWindow):
     def show_about(self):
         QMessageBox.about(self, self.t("act_about"), self.t("about_text", v=__version__))
 
+    # ------------------------------------------------- cross-sections (YarnSection)
+    def current_yarn(self):
+        """Count and blend of step 3 for new labels of the cross-section window, or None."""
+        b = self.boundary()
+        if b["tex"] is None or b["rho"] is None:
+            return None
+        return dict(count=self.count.value(), unit=self.unit.currentText(), tex=b["tex"],
+                    blend=[list(r) for r in self.blend_rows()], rho=b["rho"])
+
+    def open_sections(self):
+        from .section_window import SectionWindow
+        if self.section_win is None:
+            self.section_win = SectionWindow(lang=self.lang, link=self, default_yarn=self.current_yarn())
+        else:
+            self.section_win.default_yarn = self.current_yarn()
+        self.section_win.show()
+        self.section_win.raise_()
+        self.section_win.activateWindow()
+
+    def use_section_phi(self, phi, label, n, sd):
+        """Called by the cross-section window: mean packing density of one label."""
+        lang = self.lang
+        self.mode_theory.setChecked(True)
+        self._phi_from_sections = True
+        self.phi.setValue(round(float(phi), 3))
+        self._phi_from_sections = False
+        self.phi_source = self.t("phi_src_sections", label=label, n=n, phi=fmt(phi, 3, lang),
+                                 sd=fmt(sd, 3, lang) if sd == sd else "—")
+        self.phi_src_label.setText(self.phi_source)
+        self.update_boundary()
+
+    def phi_edited(self, *_):
+        if getattr(self, "_building", True) or self._phi_from_sections:
+            return
+        self.phi_source = None
+        self.phi_src_label.setText("")
+
     def closeEvent(self, e):
+        if self.section_win is not None and not self.section_win.close():
+            e.ignore()
+            return
         if self.runner is not None:
             self.runner.stop()
             self.runner.finish(wait=True)
