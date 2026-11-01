@@ -99,9 +99,10 @@ def test_summary():
     assert s["d_theoretical"] == pytest.approx(theoretical_diameter_um(tex, rho, 0.33), rel=1e-4)
 
 
-@pytest.mark.parametrize("bright", [True, False])
-def test_suggested_outline(bright):
-    img = synthetic_section(bright=bright)
+@pytest.mark.parametrize("kind", ["bright", "dark", "edges"])
+def test_suggested_outline(kind):
+    # edges: fibres seen only by a dark rim, as in bright-field wax sections
+    img = synthetic_section(bright=kind == "bright", edges_only=kind == "edges")
     pts = suggest_outline(img, expected_diameter_px=250)
     assert pts is not None
     p = polygon_props(pts)
@@ -120,6 +121,48 @@ def test_suggested_outline_on_a_large_image():
 
 def test_suggested_outline_on_empty_image():
     assert suggest_outline(np.full((100, 100), 50.0)) is None
+
+
+def test_suggestion_not_pulled_to_expected_size():
+    # the expected diameter sets only the scale; the region is not chosen by closeness to it
+    img = synthetic_section(edges_only=True)
+    areas = [polygon_props(suggest_outline(img, expected_diameter_px=d))["area"] for d in (200, 250, 320)]
+    assert max(areas) / min(areas) < 1.08
+
+
+def test_outline_status_in_summary_files_and_table(tmp_path):
+    tex, rho = 42.18, 1.52
+    af = substance_area_um2(tex, rho)
+    pr = empty_project()
+    pr["pixel_um"] = 1.0
+    pr["yarns"]["B0"] = dict(count=14, unit="Ne", tex=tex, blend=[["cotton", 100, rho]], rho=rho)
+    img = tmp_path / "s.png"
+    img.write_bytes(b"")
+    for phi, st in ((0.30, "accepted"), (0.32, "edited"), (0.34, "manual"), (0.50, "suggested")):
+        pr["sections"].append(dict(label="B0", image=str(img), outline=circle(math.sqrt(af / phi / math.pi), n=90),
+                                   use=True, status=st))
+    rows, summary = evaluate(pr)
+    s = summary["B0"]
+    assert s["n"] == 3 and s["n_pending"] == 1
+    assert (s["n_accepted"], s["n_edited"], s["n_manual"]) == (1, 1, 1)
+    assert s["phi_mean"] == pytest.approx(0.32, rel=2e-3)         # the unconfirmed 0.50 is left out
+    assert rows[3][1]["pending"] and not rows[0][1]["pending"]
+    f = tmp_path / "o.json"
+    save_outlines(str(f), pr)
+    back = load_outlines(str(f))
+    assert [x["status"] for x in back["sections"]] == ["accepted", "edited", "manual", "suggested"]
+    # a file written without statuses: outlines count as drawn by hand
+    import json
+    data = json.loads(f.read_text(encoding="utf-8"))
+    for x in data["sections"]:
+        del x["status"]
+    data["sections"].append(dict(label="B0", image="s.png", outline=[], use=True))
+    f.write_text(json.dumps(data), encoding="utf-8")
+    old = load_outlines(str(f))
+    assert [x["status"] for x in old["sections"]] == ["manual"] * 4 + [""]
+    from yarnhair.section import section_table, SECTION_COLUMNS
+    tab = section_table(rows)
+    assert tab[0] == SECTION_COLUMNS and tab[4][SECTION_COLUMNS.index("status")] == "suggested"
 
 
 def test_outline_file_round_trip(tmp_path):

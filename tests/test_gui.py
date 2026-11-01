@@ -90,6 +90,59 @@ def test_section_window_and_link(tmp_path):
     main.close()
 
 
+def test_section_suggestion_workflow(tmp_path):
+    """An image without outline gets a suggestion; it counts only when accepted, corrected or replaced."""
+    pytest.importorskip("PySide6")
+    import numpy as np
+    from PIL import Image
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    from yarnhair.gui.section_window import SectionWindow
+    from yarnhair.section import synthetic_section
+    app = QApplication.instance() or QApplication([])
+    yarn = dict(count=14, unit="Ne", tex=590.5 / 14, blend=[["cotton", 100, 1.52]], rho=1.52)
+    files = []
+    for k in range(3):
+        p = tmp_path / f"e{k}.png"
+        Image.fromarray(synthetic_section(seed=k, edges_only=True).astype(np.uint8)).save(p)
+        files.append(["B0", str(p)])
+    w = SectionWindow(lang="en", default_yarn=yarn)
+    w.pixel.setValue(1.0)
+    w.add_files(files)                                # opens the first image: suggestion
+    app.processEvents()
+    secs = w.project["sections"]
+    assert secs[0]["status"] == "suggested" and len(secs[0]["outline"]) == 48
+    assert w.accept_btn.isEnabled() and w.draw_btn.isEnabled()
+    assert "B0" not in w.summary or w.summary["B0"]["n"] == 0
+    w.accept_suggestion()
+    assert secs[0]["status"] == "accepted" and w.summary["B0"]["n"] == 1 and not w.accept_btn.isEnabled()
+    # second image: the user draws it himself; Ctrl+Z brings the suggestion back
+    w.select(1)
+    assert secs[1]["status"] == "suggested"
+    sug = list(secs[1]["outline"])
+    w.draw_myself()
+    assert secs[1]["outline"] == [] and secs[1]["status"] == "manual"
+    w.view.undo()
+    assert secs[1]["outline"] == sug and secs[1]["status"] == "suggested"
+    moved = [(x + (5 if k == 0 else 0), y) for k, (x, y) in enumerate(sug)]
+    w.view.set_points(moved)                          # a point moved
+    assert secs[1]["status"] == "edited" and w.summary["B0"]["n"] == 2
+    w.view.undo()
+    assert secs[1]["status"] == "suggested" and w.summary["B0"]["n"] == 1
+    # third image stays unconfirmed: listed, not in the mean
+    w.select(2)
+    assert secs[2]["status"] == "suggested"
+    s = w.summary["B0"]
+    assert s["n"] == 1 and s["n_pending"] == 2 and s["n_accepted"] == 1
+    # an accepted section is not suggested again when it is opened again
+    w.select(0)
+    assert secs[0]["status"] == "accepted"
+    w.write_results(str(tmp_path / "r.tsv"))
+    assert "suggested" in (tmp_path / "r.tsv").read_text(encoding="utf-8")
+    w.dirty = False
+    w.close()
+
+
 def test_yarnsection_selftest(capsys):
     pytest.importorskip("PySide6")
     from yarnhair.gui.section_app import selftest
