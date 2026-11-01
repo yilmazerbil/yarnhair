@@ -62,9 +62,19 @@ def test_all_messages_have_both_languages():
 
 def test_regression_values():
     """Locks the measurement core: any change in the algorithm or its
-    defaults changes these numbers (values of version 1.0.0)."""
+    defaults changes these numbers (values of version 1.0.0).
+
+    One hair end of this synthetic frame lies on a rounding boundary, so x86-64
+    and ARM64 processors (Apple M chips, ARM Linux) give total and mean hair
+    lengths that differ by 0.3 %; both are locked. Published frames measured on
+    both processor types gave identical values (README, Reproducibility)."""
+    import platform
     res, *_ = measure_frame(synthetic(), diameter_um=0, pixel_um=3.85)
     expected = dict(apparent_diameter_px=58, boundary_radius_px=29.0, N=12.987013,
-                    L=7.441667, N05=12.987013, N1=0.0, unresolved=0, mean_length=0.573008)
+                    N05=12.987013, N1=0.0, unresolved=0)
+    if platform.machine().lower() in ("arm64", "aarch64"):
+        expected.update(L=7.466667, mean_length=0.574933)
+    else:
+        expected.update(L=7.441667, mean_length=0.573008)
     for k, v in expected.items():
         assert abs(res[k] - v) <= 1e-5 * max(1.0, abs(v)), (k, res[k], v)
