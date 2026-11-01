@@ -1,4 +1,4 @@
-# Builds the double-click programs for macOS and Windows.
+# Builds the double-click programs YarnHair and YarnSection for macOS and Windows.
 # Runs by hand (Actions -> build-apps -> Run workflow) and for every pushed tag v*;
 # for a tag the zip files are attached to the release of that tag.
 name: build-apps
@@ -34,29 +34,45 @@ jobs:
         run: python -m pytest -q
       - name: Build
         working-directory: packaging
-        run: pyinstaller YarnHair.spec --noconfirm --distpath ../dist --workpath ../build
-      - name: Self-test of the built program (macOS)
+        run: |
+          pyinstaller YarnHair.spec --noconfirm --distpath ../dist --workpath ../build
+          pyinstaller YarnSection.spec --noconfirm --distpath ../dist --workpath ../build
+      - name: Self-test of the built programs (macOS)
         if: runner.os == 'macOS'
-        run: dist/YarnHair.app/Contents/MacOS/YarnHair --selftest
-      - name: Self-test of the built program (Windows)
+        run: |
+          dist/YarnHair.app/Contents/MacOS/YarnHair --selftest
+          dist/YarnSection.app/Contents/MacOS/YarnSection --selftest
+      - name: Self-test of the built programs (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath dist\YarnHair\YarnHair.exe -ArgumentList "--selftest" -Wait -PassThru
-          exit $p.ExitCode
+          foreach ($n in "YarnHair", "YarnSection") {
+            $p = Start-Process -FilePath "dist\$n\$n.exe" -ArgumentList "--selftest" -Wait -PassThru
+            if ($p.ExitCode -ne 0) { Write-Error "$n self-test failed"; exit $p.ExitCode }
+          }
       - name: Zip (macOS)
         if: runner.os == 'macOS'
-        run: ditto -c -k --keepParent dist/YarnHair.app YarnHair-${{ matrix.name }}.zip
+        run: |
+          ditto -c -k --keepParent dist/YarnHair.app YarnHair-${{ matrix.name }}.zip
+          ditto -c -k --keepParent dist/YarnSection.app YarnSection-${{ matrix.name }}.zip
       - name: Zip (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: Compress-Archive -Path dist\YarnHair -DestinationPath YarnHair-${{ matrix.name }}.zip
+        run: |
+          Compress-Archive -Path dist\YarnHair -DestinationPath YarnHair-${{ matrix.name }}.zip
+          Compress-Archive -Path dist\YarnSection -DestinationPath YarnSection-${{ matrix.name }}.zip
       - uses: actions/upload-artifact@v4
         with:
           name: YarnHair-${{ matrix.name }}
           path: YarnHair-${{ matrix.name }}.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YarnSection-${{ matrix.name }}
+          path: YarnSection-${{ matrix.name }}.zip
       - name: Attach to the release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: YarnHair-${{ matrix.name }}.zip
+          files: |
+            YarnHair-${{ matrix.name }}.zip
+            YarnSection-${{ matrix.name }}.zip
