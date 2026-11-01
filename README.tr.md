@@ -217,10 +217,14 @@ de çalışır.
 2. Piksel boyutu: yazın ya da mikrometre görüntüsünde ölçün.
 3. Her etiket için numara ve karışımı girin (**Numara ve karışım…**; özlü
    iplikte özü de ekleyin).
-4. Her görüntüde sınırı çizin: sıkı gövdenin çevresine, ona hâlâ ait olan en
-   dıştaki liflerin çevresinden tıklayın; sapan ve yerinden oynamış lifler
-   dışarıda kalır. **Sınır öner** düzeltilecek bir sınır önerir. Noktalar
-   sürüklenebilir, kenara eklenebilir ve silinebilir (Backspace, Delete, Ctrl+Z).
+4. Her görüntüde sınırı kontrol edin. Sınırı olmayan bir görüntü açılınca bir
+   sınır önerilir (durum "Önerildi – onaylanmadı"). Sınır sıkı gövdenin
+   çevresinden, ona hâlâ ait olan en dıştaki liflerin çevresinden geçer; sapan
+   ve yerinden oynamış lifler dışarıda kalır. Öneri böyleyse **Öneriyi kabul
+   et**'i seçin; değilse noktalarını taşıyın ya da **Kendim çizeceğim**'i seçip
+   gövdenin çevresine tıklayın. Noktalar sürüklenebilir, kenara eklenebilir ve
+   silinebilir (Backspace, Delete, Ctrl+Z). Onaylanmayan öneri listede görünür
+   ama ortalamaya girmez; "tümünü kabul et" yoktur.
 5. **Kesitler** sekmesi her kesitin alanını, eşdeğer daire çapını, uzun ve kısa
    eksenini, en/boy oranını ve φ'sini; **Etikete göre özet** sekmesi ortalama ±
    SS'yi, ortalamanın %95 güven aralığını ve YarnHair'in kullanacağı çapı verir.
@@ -232,6 +236,16 @@ hesaplanan φ gösterilir. Kesitleri **Kullan** işaretiyle ortalamadan
 (gevşek elastanlı özlü iplik kabarır), eksene dik kesin ve iplik başına 15–20
 kesit alın; güven aralığı ±0,02'den genişse kesit ekleyin. Özün düşmesi sınırın
 içinde bir boşluk bırakır, sonucu değiştirmez.
+
+Öneri, daha önceki bir çalışmadan Eurelon 950 mumunda alınmış 14 aydınlık alan
+kesitinde (30 µm) denendi; bu kesitlerde iplik alanını bir operatör daireyle
+işaretlemişti (görüntüler bu depoda yok). Göz kontrolüne göre öneri,
+pamuk/elastan özlü ipliğin 5 kesitinde sıkı gövdeyi izledi (alan dairenin
+0,84–1,05 katı); 4 pamuk kesitinde bir yandaki kaymış lifleri de içine aldı
+(üçünde 1,12–1,31, birinde 0,81 kat); gevşek paketlenmiş 5 çift özlü kesitte
+ya sınır bulamadı (2) ya da gövdenin düzensiz bir parçasını aldı (3). Özet her
+etiket için kabul edilen, düzeltilen ve elle çizilen sınırları sayar; böylece
+düzeltme gereken önerilerin payı sonuçlarla birlikte verilebilir.
 
 **Dosya → Sınırları kaydet** sınırları, iplikleri ve piksel boyutunu bir JSON
 dosyasına yazar; bundan sonra her değişiklik bu dosyaya kaydedilir. `yarnhair

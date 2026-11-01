@@ -22,7 +22,10 @@ First public release.
 - Command-line interface in English and Turkish (`--lang en|tr`, or
   `YARNHAIR_LANG`); README in both languages (README.md, README.tr.md).
 - Packing density from yarn cross-sections (YarnSection): the outline of the
-  yarn body is drawn on section images (optional automatic suggestion), the
+  yarn body is drawn on section images; an outline is suggested when an image
+  is opened (fibre edges, or grey level) and counts only after the user
+  accepts it, corrects it or draws one by hand; the status of every outline
+  (suggested, accepted, edited, manual) is saved and counted per label. The
   fibre area comes from count and blend (1000·T/ρ), φ per section and per
   label with confidence interval, aspect check for oblique or flattened
   sections, outline files (JSON), Excel/text output and checking images.

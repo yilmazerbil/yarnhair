@@ -216,10 +216,15 @@ whose fibres cannot be separated.
 2. Pixel size: type it or measure it on a stage-micrometer image.
 3. For each label enter count and blend (**Count and blend…**; include the core
    of core-spun yarns).
-4. Draw the outline on each image: click around the compact body, around the
-   outermost fibres that still belong to it; protruding and displaced fibres stay
-   outside. **Suggest outline** proposes one to correct. Points can be dragged,
-   inserted on an edge and removed (Backspace, Delete, Ctrl+Z).
+4. Check the outline on each image. When an image without an outline is
+   opened, an outline is suggested (status "Suggested – not confirmed"). The
+   outline runs around the compact body, around the outermost fibres that still
+   belong to it; protruding and displaced fibres stay outside. If the suggestion
+   does so, choose **Accept suggestion**; otherwise move its points or choose
+   **I will draw it** and click around the body. Points can be dragged,
+   inserted on an edge and removed (Backspace, Delete, Ctrl+Z). A suggestion
+   that is not confirmed is listed but left out of the mean; there is no
+   "accept all".
 5. The **Sections** tab gives area, equal-area diameter, long and short axis,
    aspect and φ of every section; the **Summary per label** tab gives mean ± SD,
    the 95 % confidence interval of the mean and the diameter YarnHair would use.
@@ -231,6 +236,16 @@ under the light tension it has in the images to be measured (a relaxed elastane
 core-spun yarn bulks), cut perpendicular to the axis and take 15–20 sections per
 yarn; add sections while the confidence interval is wider than ±0.02. A lost
 core leaves a hole inside the outline and changes nothing.
+
+The suggestion was tried on 14 bright-field sections in Eurelon 950 wax (30 µm)
+from an earlier study, whose yarn area an operator had marked with a circle
+(images not in this repository). By eye, it followed the compact body on the 5
+sections of a cotton/elastane core-spun yarn (area 0.84–1.05 × the circle); on
+4 cotton sections it also took in sheared fibres on one side (1.12–1.31 × on
+three, 0.81 × on one); on 5 loosely packed dual-core sections it found nothing
+(2) or an irregular part of the body (3). The summary counts accepted,
+corrected and hand-drawn outlines per label, so the share of suggestions that
+needed correcting can be reported with the results.
 
 **File → Save outlines** writes the outlines, yarns and pixel size to a JSON
 file; from then on every change is saved to it. `yarnhair section
