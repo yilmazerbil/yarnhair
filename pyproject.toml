@@ -5,13 +5,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "yarnhair"
 version = "1.0.0"
-description = "Rule-based measurement of yarn hairiness (hair count and protruding length) from microscope images, with a graphical program"
+description = "Rule-based measurement of yarn hairiness (hair count and protruding length) from microscope images, and packing density from yarn cross-sections, with graphical programs"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "Yılmaz Erbil"}]
 requires-python = ">=3.9"
 dependencies = ["numpy>=1.24", "scipy>=1.10", "scikit-image>=0.22", "Pillow>=9.0"]
-keywords = ["yarn", "hairiness", "image analysis", "textile", "microscopy"]
+keywords = ["yarn", "hairiness", "packing density", "cross-section", "image analysis", "textile", "microscopy"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: MIT License",
@@ -27,6 +27,7 @@ yarnhair = "yarnhair.cli:main"
 
 [project.gui-scripts]
 yarnhair-gui = "yarnhair.gui.app:main"
+yarnsection = "yarnhair.gui.section_app:main"
 
 [tool.setuptools]
 packages = ["yarnhair", "yarnhair.gui"]

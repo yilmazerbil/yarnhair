@@ -3,7 +3,10 @@
 Türkçe | [English](README.md)
 
 Mikroskop görüntülerinden kural tabanlı iplik tüylülüğü ölçümü; grafik arayüzlü
-program (Türkçe/İngilizce) ve komut satırı.
+program (Türkçe/İngilizce) ve komut satırı. İkinci program **YarnSection**,
+ipliklerin paketleme yoğunluğunu kesit görüntülerinden ölçer; YarnHair bunu
+iplik gövdesinin sınırını belirlemek için kullanır (bkz. *Kesitlerden paketleme
+yoğunluğu*).
 
 YarnHair, koyu zemin üzerinde parlak görünen düz bir iplik parçasının mikroskop
 görüntüsünde iplikten çıkan lifleri (tüyleri) bulur ve 10 mm iplik başına şunları
@@ -51,7 +54,9 @@ Ayrıntılar ve tüm parametreler (İngilizce): [docs/method.md](docs/method.md)
 (Apple M serisi işlemcili Mac'ler için `YarnHair-macOS-AppleSilicon.zip`, Intel
 işlemcili Mac'ler için `YarnHair-macOS-Intel.zip`, ya da `YarnHair-Windows.zip`),
 açın ve **YarnHair**'e çift tıklayın. Başka bir şey
-kurmanız gerekmez. Programlar imzalı olmadığı için sistem bir kez sorar:
+kurmanız gerekmez. `YarnSection-….zip` kesit programını tek başına içerir (aynı
+pencere YarnHair'den de açılır). Programlar imzalı olmadığı için sistem bir kez
+sorar:
 
 - macOS: "YarnHair açılamıyor…" → **Sistem Ayarları → Gizlilik ve Güvenlik** →
   YarnHair iletisinin yanındaki **Yine de Aç**.
@@ -74,7 +79,10 @@ adımını izler:
    karışıma ekleyin. Sonra ya
    - **paketleme yoğunluğunu girin** (varsayılan 0,32): teorik çap hesaplanır, ya da
    - **ölçülmüş çapı girin** (kesitten ya da optik yan görüntüden): paketleme
-     yoğunluğu hesaplanır ve denetlenir.
+     yoğunluğu hesaplanır ve denetlenir, ya da
+   - **Kesitlerden…**: kesit penceresini (YarnSection) açar; **Seçili etiketin
+     φ'sini YarnHair'de kullan**, o etiketin kesitlerinde ölçülen ortalama
+     paketleme yoğunluğunu girer.
 
    Paketleme yoğunluğu, programda kayıtlı literatür değerleriyle (Yardım →
    Paketleme yoğunluğu kaynakları) aynı ölçüm türü ve eğirme sistemi için
@@ -98,8 +106,9 @@ arşivi), açın ve o klasörde şunu çalıştırın:
 
 ```bash
 pip install .            # yalnız komut satırı
-pip install ".[gui]"     # grafik arayüzlü programla (PySide6, openpyxl)
-yarnhair-gui             # grafik programı başlat
+pip install ".[gui]"     # grafik arayüzlü programlarla (PySide6, openpyxl)
+yarnhair-gui             # YarnHair'i başlat
+yarnsection              # YarnSection'ı başlat
 ```
 
 Python ≥ 3.9. Yayımlanan değerler numpy 2.2.6, scipy 1.15.3 ve scikit-image
@@ -122,6 +131,9 @@ yarnhair --lang tr diameter --tex 42.18 --blend cotton=50,lyocell=25,pla=25
 # kontrol görüntülerini kaydet
 yarnhair --lang tr measure kareler/B0/*.bmp --label B0 --diameter-um 331 \
          --pixel-um 3.85 --out results.tsv --overlay-dir kontrol
+
+# YarnSection'ın kaydettiği sınır dosyasından etiket başına paketleme yoğunluğu
+yarnhair --lang tr section sinirlar.json --out kesitler.tsv
 ```
 
 Python içinden:
@@ -176,14 +188,56 @@ en çok da ipliğin kenarının nereden çizildiğine bağlıdır:
 
 YarnHair'de gövde sınırı ipliğin dış kenarıdır; bu yüzden varsayılan bir kesit
 değeridir: yayımlanan analizdeki iplik türü olan pamuk/elastan özlü ring
-ipliğinde ölçülen 0,32 (Erbil ve ark. 2022). Karşılaştırılan tüm ipliklerde
-aynı değeri ya da varsa her iplik için ölçülmüş değeri kullanın.
+ipliğinde ölçülen 0,32 (Erbil ve ark. 2022). Her ipliğin kesitlerinde ölçülen
+değeri (YarnSection) tercih edin: tüm ipliklere tek değer verilirse iplikler
+arasındaki paketleme farkı tüylülük farkı olarak sayılır. 0,05 düşük bir değer
+sınırı yaklaşık %8 geniş çizer.
 
 Yayımlanan analizde 0,32 yerine 0,6 kullanmak sınırı en çok %27 daraltıp tüy
 sayısını ve uzunluğunu %16–29 artırdı; on ipliğin sıralaması neredeyse aynı
 kaldı (Spearman ρ ≥ 0,96). Yayımlanan teorik çaplarda yalnız kesikli lif
 kılıfının yoğunluğu kullanıldı (elastan öz dışarıda); programın istediği gibi
 özü de katmak çapı %1'den az değiştirir.
+
+## Kesitlerden paketleme yoğunluğu (YarnSection)
+
+İplik eksenine dik kesilmiş kesitlerin görüntülerinde iplik gövdesinin sınırı
+çizilir; böyle bir kesitteki lif alanı yalnız numara ve karışımdan gelir, bu
+yüzden görüntüde lif tanımak gerekmez:
+
+    φ = (1000 · T / ρ) / A      (T tex, ρ karışım yoğunluğu g/cm³, A µm²)
+
+A, sınırın içindeki alandır. Birim uzunluktaki kütle, yoğunluk ile enine
+kesitteki lif alanının çarpımıdır; lif inceliği, lif sayısı ve büküm hesaba
+girmez. Yöntem bu yüzden lifleri ayırt edilemeyen mum ya da reçine kesitlerinde
+de çalışır.
+
+1. Kesit görüntülerini ekleyin (YarnHair'deki gibi alt klasör adları etiket
+   olabilir).
+2. Piksel boyutu: yazın ya da mikrometre görüntüsünde ölçün.
+3. Her etiket için numara ve karışımı girin (**Numara ve karışım…**; özlü
+   iplikte özü de ekleyin).
+4. Her görüntüde sınırı çizin: sıkı gövdenin çevresine, ona hâlâ ait olan en
+   dıştaki liflerin çevresinden tıklayın; sapan ve yerinden oynamış lifler
+   dışarıda kalır. **Sınır öner** düzeltilecek bir sınır önerir. Noktalar
+   sürüklenebilir, kenara eklenebilir ve silinebilir (Backspace, Delete, Ctrl+Z).
+5. **Kesitler** sekmesi her kesitin alanını, eşdeğer daire çapını, uzun ve kısa
+   eksenini, en/boy oranını ve φ'sini; **Etikete göre özet** sekmesi ortalama ±
+   SS'yi, ortalamanın %95 güven aralığını ve YarnHair'in kullanacağı çapı verir.
+
+Eğik kesit sınırı uzatır (20° → alan %6 fazla, φ %6 düşük), kısa ekseni
+değiştirmez; en/boy oranı 1,3'ü aşan kesitler işaretlenir ve kısa eksenle
+hesaplanan φ gösterilir. Kesitleri **Kullan** işaretiyle ortalamadan
+çıkarabilirsiniz. İpliği ölçülecek görüntülerdeki hafif gerginlikte gömün
+(gevşek elastanlı özlü iplik kabarır), eksene dik kesin ve iplik başına 15–20
+kesit alın; güven aralığı ±0,02'den genişse kesit ekleyin. Özün düşmesi sınırın
+içinde bir boşluk bırakır, sonucu değiştirmez.
+
+**Dosya → Sınırları kaydet** sınırları, iplikleri ve piksel boyutunu bir JSON
+dosyasına yazar; bundan sonra her değişiklik bu dosyaya kaydedilir. `yarnhair
+section outlines.json --out sections.tsv` tüm değerleri böyle bir dosyadan
+yeniden hesaplar. Ayrıntılar (İngilizce): [docs/method.md](docs/method.md), 9.
+bölüm.
 
 ## Çalışma süresi
 
@@ -194,9 +248,16 @@ birbirinden bağımsızdır; bellek yettiği ölçüde birkaç işlem paralel ç
 
 1.0.0 sürümü, aşağıdaki makalede kullanılan algoritmayı ve varsayılan
 parametreleri içerir; makaledeki 275 kare değeri bu kod ve yukarıdaki kütüphane
-sürümleriyle üretildi. `yarnhair-gui --selftest` (indirilen programda
-`YarnHair --selftest`) yapay bir kareyi ayrı bir işlemde ölçer ve pencereyi
-ekransız açar; çıkış kodu 0 ise kurulum çalışıyor demektir.
+sürümleriyle ARM64 işlemcide (Apple M1, Linux) üretildi. Bu karelerden otuzu
+x86-64 işlemcide aynı sürümlerle yeniden ölçüldü; değerler birebir aynı çıktı.
+Regresyon testindeki yapay kare bir sınır durumudur (bir tüy ucu yuvarlama
+sınırına düşer): tüy uzunluğu iki işlemci türü arasında %0,3 farklıdır; test iki
+değeri de tutar.
+
+`yarnhair-gui --selftest` (indirilen programda `YarnHair --selftest`) yapay bir
+kareyi ayrı bir işlemde ölçer ve pencereleri ekransız açar; `yarnsection
+--selftest` (`YarnSection --selftest`) yapay bir kesitin sınırını çizer. Çıkış
+kodu 0 ise kurulum çalışıyor demektir.
 
 ## Kaynaklar
 

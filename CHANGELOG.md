@@ -21,3 +21,14 @@ First public release.
   results checked on two published frames).
 - Command-line interface in English and Turkish (`--lang en|tr`, or
   `YARNHAIR_LANG`); README in both languages (README.md, README.tr.md).
+- Packing density from yarn cross-sections (YarnSection): the outline of the
+  yarn body is drawn on section images (optional automatic suggestion), the
+  fibre area comes from count and blend (1000·T/ρ), φ per section and per
+  label with confidence interval, aspect check for oblique or flattened
+  sections, outline files (JSON), Excel/text output and checking images.
+  Available as a program of its own (YarnSection, `yarnsection`), as a window of
+  YarnHair that passes the mean φ of a label to the boundary settings, and as
+  `yarnhair section` for recalculating saved outlines.
+- Regression test holds the values of the synthetic test frame for x86-64 and
+  ARM64 processors separately (0.3 % difference in hair length on this frame;
+  published frames measured on both processor types were identical).

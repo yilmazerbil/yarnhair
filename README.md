@@ -3,7 +3,10 @@
 [Türkçe](README.tr.md) | English
 
 Rule-based measurement of yarn hairiness from microscope images, with a
-graphical program (English/Turkish) and a command-line interface.
+graphical program (English/Turkish) and a command-line interface. A second
+program, **YarnSection**, measures the packing density of yarns from
+cross-section images; YarnHair uses it to place the yarn body boundary
+(see *Packing density from cross-sections*).
 
 YarnHair finds the protruding fibres (hairs) on a microscope image of a straight
 yarn segment that appears bright on a dark background, and reports, per 10 mm of
@@ -51,7 +54,9 @@ Download the zip file for your computer from the **Releases** page
 (`YarnHair-macOS-AppleSilicon.zip` for Macs with an Apple M-series chip,
 `YarnHair-macOS-Intel.zip` for Macs with an Intel processor, or
 `YarnHair-Windows.zip`), unzip it and double-click **YarnHair**. Nothing else
-needs to be installed. The programs are not signed, so the system asks once:
+needs to be installed. `YarnSection-….zip` contains the cross-section program
+on its own (the same window also opens from YarnHair). The programs are not
+signed, so the system asks once:
 
 - macOS: "YarnHair cannot be opened…" → **System Settings → Privacy & Security**
   → **Open Anyway** next to the YarnHair message.
@@ -75,7 +80,10 @@ follows the four steps of a measurement:
    - **enter the packing density** (default 0.32): the theoretical diameter is
      calculated, or
    - **enter a measured diameter** (from cross-sections or an optical side view):
-     the packing density is calculated and checked.
+     the packing density is calculated and checked, or
+   - **From cross-sections…**: opens the cross-section window (YarnSection);
+     **Use φ of the selected label in YarnHair** sets the mean packing density
+     measured on the sections of that label.
 
    The packing density is compared with values stored from the literature
    (Help → Packing density references) for the same kind of measurement and
@@ -99,8 +107,9 @@ a release), unzip it, and run in that folder:
 
 ```bash
 pip install .            # command line only
-pip install ".[gui]"     # with the graphical program (PySide6, openpyxl)
-yarnhair-gui             # start the graphical program
+pip install ".[gui]"     # with the graphical programs (PySide6, openpyxl)
+yarnhair-gui             # start YarnHair
+yarnsection              # start YarnSection
 ```
 
 Python ≥ 3.9. The published values were reproduced exactly with numpy 2.2.6,
@@ -122,6 +131,9 @@ yarnhair diameter --tex 42.18 --blend cotton=50,lyocell=25,pla=25
 # measure all frames of one yarn; append to results.tsv; save checking images
 yarnhair measure frames/B0/*.bmp --label B0 --diameter-um 331 \
          --pixel-um 3.85 --out results.tsv --overlay-dir overlays
+
+# packing density per label from an outline file saved by YarnSection
+yarnhair section outlines.json --out sections.tsv
 ```
 
 From Python:
@@ -176,14 +188,54 @@ the yarn is drawn:
 
 The body boundary in YarnHair is the outer edge of the yarn, so the default is a
 cross-section value: 0.32, measured on cotton/elastane core-spun ring yarn, the
-yarn type of the published analysis (Erbil et al. 2022). Use one value for all
-yarns of a comparison, or a measured value per yarn if available.
+yarn type of the published analysis (Erbil et al. 2022). Prefer a value measured
+on cross-sections of each yarn (YarnSection): with one value for all yarns,
+differences in packing between the yarns are counted as differences in
+hairiness. A value 0.05 too low makes the boundary about 8 % too wide.
 
 In the published analysis, 0.6 instead of 0.32 made the boundary up to 27 %
 narrower and raised hair counts and lengths by 16–29 %, with almost the same
 ranking of the ten yarns (Spearman ρ ≥ 0.96). The published theoretical
 diameters used the density of the staple sheath only (elastane core left out);
 including the core, as the program asks, changes them by less than 1 %.
+
+## Packing density from cross-sections (YarnSection)
+
+The outline of the yarn body is drawn on images of sections cut perpendicular to
+the yarn axis; the fibre area of such a section follows from count and blend
+alone, so no fibre has to be recognised in the image:
+
+    φ = (1000 · T / ρ) / A      (T in tex, ρ blend density in g/cm³, A in µm²)
+
+A is the area inside the outline. The mass per unit length equals the density
+times the fibre area in a transverse section, so fibre fineness, fibre number
+and twist do not enter. The method therefore also works on wax or resin sections
+whose fibres cannot be separated.
+
+1. Add the section images (sub-folder names can be the labels, as in YarnHair).
+2. Pixel size: type it or measure it on a stage-micrometer image.
+3. For each label enter count and blend (**Count and blend…**; include the core
+   of core-spun yarns).
+4. Draw the outline on each image: click around the compact body, around the
+   outermost fibres that still belong to it; protruding and displaced fibres stay
+   outside. **Suggest outline** proposes one to correct. Points can be dragged,
+   inserted on an edge and removed (Backspace, Delete, Ctrl+Z).
+5. The **Sections** tab gives area, equal-area diameter, long and short axis,
+   aspect and φ of every section; the **Summary per label** tab gives mean ± SD,
+   the 95 % confidence interval of the mean and the diameter YarnHair would use.
+
+An oblique cut stretches the outline (20° → 6 % more area, φ 6 % lower) but not
+its short axis; sections with aspect above 1.3 are flagged and their φ with the
+short axis is shown. Leave sections out of the mean with **Use**. Embed the yarn
+under the light tension it has in the images to be measured (a relaxed elastane
+core-spun yarn bulks), cut perpendicular to the axis and take 15–20 sections per
+yarn; add sections while the confidence interval is wider than ±0.02. A lost
+core leaves a hole inside the outline and changes nothing.
+
+**File → Save outlines** writes the outlines, yarns and pixel size to a JSON
+file; from then on every change is saved to it. `yarnhair section
+outlines.json --out sections.tsv` recalculates all values from such a file. Details:
+[docs/method.md](docs/method.md), section 9.
 
 ## Run time
 
@@ -194,10 +246,16 @@ so several processes run in parallel as far as memory allows.
 
 Version 1.0.0 contains the algorithm and default parameters used for the
 article below; its 275 frame values were produced with this code and the
-library versions above. `yarnhair-gui
---selftest` (or `YarnHair --selftest` for the downloaded program) measures a
-synthetic frame in a worker process and opens the window off-screen; exit code 0
-means that the installation works.
+library versions above on an ARM64 processor (Apple M1, Linux). Thirty of these
+frames, measured again on an x86-64 processor with the same versions, gave
+identical values. The synthetic frame of the regression test is a border case
+(one hair end lies on a rounding boundary): its hair length differs by 0.3 %
+between the two processor types, and the test holds both values.
+
+`yarnhair-gui --selftest` (or `YarnHair --selftest` for the downloaded program)
+measures a synthetic frame in a worker process and opens the windows off-screen;
+`yarnsection --selftest` (`YarnSection --selftest`) outlines a synthetic
+section. Exit code 0 means that the installation works.
 
 ## References
 
