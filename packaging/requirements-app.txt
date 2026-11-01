@@ -1,0 +1,12 @@
+# Versions used to build the double-click programs.
+# numpy, scipy and scikit-image are pinned: these are the versions with which the
+# published frame values were reproduced exactly (newer versions can differ
+# by a few tenths of a percent in L).
+numpy==2.2.6
+scipy==1.15.3
+scikit-image==0.25.2
+Pillow>=10,<13
+PySide6>=6.6,<7
+openpyxl>=3.1
+pyinstaller>=6.10
+pytest>=7
