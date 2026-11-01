@@ -95,3 +95,62 @@ kind (and the same spinning system when there are any): `error` if φ ≥ 1 (can
 used), `warning` if φ > 0.907 (densest packing of equal round fibres), `notice` if it lies
 more than 0.05 outside the range of the matching references, otherwise `ok`. Values
 read from bar charts are marked approx.
+
+## 9. Packing density from cross-sections (YarnSection)
+
+`yarnhair/section.py`; graphical program YarnSection, also opened from YarnHair
+(**From cross-sections…** in step 3, or **Tools**); command `yarnhair section`.
+
+**Principle.** The outline of the yarn body is drawn on an image of a section
+perpendicular to the yarn axis: around the outermost fibres that still belong to the
+compact body; protruding and displaced fibres stay outside. The fibre area of such a
+section follows from the yarn count and the blend density alone,
+
+    A_f = 1000 T / ρ   (µm²; T in tex, ρ = 1 / Σ(wᵢ/ρᵢ) in g/cm³),
+
+because the mass per unit length of yarn equals the density times the fibre area in a
+transverse section. Fibre fineness, number of fibres and twist do not enter (the number
+of fibres in a section depends on twist, their total area does not). The packing density
+of a section is φ = A_f / A, with A the area inside the outline; d = 2√(A/π) is the
+diameter of the circle of equal area. Fibres need not be recognised in the image, so the
+method also works on sections whose fibres cannot be separated. The elastane core of a
+core-spun yarn is part of T and of the blend; a hole left by a lost core lies inside the
+outline and changes nothing.
+
+**Geometry.** Area and centroid by the shoelace formula; the second area moments of the
+polygon give the ellipse with the same moments, whose full axes are reported as long and
+short axis (both equal the diameter for a circle). An outline that crosses itself is
+rejected.
+
+**Checks.** Aspect = long / short axis. An oblique cut at angle α stretches the outline
+by 1/cos α in one direction and leaves the short axis unchanged (α = 20°: area +6 %,
+φ −6 %); flattening by the knife also raises the aspect. Sections with aspect > 1.3 are
+flagged, and for them φ with the short axis, A_f / (π d_short² / 4), is shown (correct
+only if the yarn is round and the stretch comes from the cut). Sections can be left out
+of the mean ("Use").
+
+**Summary per label.** Mean ± SD of φ over the sections used, the 95 % confidence
+interval of the mean (t distribution), CV, mean ± SD of d, mean aspect, number flagged,
+φ of the mean area, and the diameter YarnHair calculates from count, blend and the mean
+φ. YarnHair takes the mean φ of a label with **Use φ of the selected label in YarnHair**
+(at least 3 sections); its source is written to the settings sheet of the results.
+
+**Outline suggestion.** Optional starting point: Gaussian smoothing (σ = 1.5 px), Otsu
+threshold, both polarities tried; closing with a disk of 6 % of the expected diameter
+(theoretical diameter at φ = 0.32 from count and blend), hole filling, opening with half
+that radius (morphology by Euclidean distance transform); the compact region (solidity
+≥ 0.7) not touching the border whose area is closest to the expected area (0.2–5×) is
+taken; its contour is resampled to 48 points equally spaced along it (a circle comes out
+0.3 % small). Images larger than 1600 px are reduced by block averaging for this step. The measurement is always the
+outline the user accepts.
+
+**Files.** Outlines, yarns (count, blend, density) and pixel size are saved as JSON with
+image paths relative to the file; after the first save every change is written to the
+file. `yarnhair section outlines.json --out sections.tsv` recalculates all values from
+such a file.
+
+**Recommendations.** Embed the yarn under the same light tension as during imaging (a
+relaxed elastane core-spun yarn bulks and gives a lower φ); cut perpendicular to the yarn
+axis; take 15–20 sections per yarn from different places; add sections when the 95 %
+interval is wider than ±0.02 (±0.02 in φ is about ±3 % in diameter). Determine the pixel
+size with a stage micrometer at the same magnification.
