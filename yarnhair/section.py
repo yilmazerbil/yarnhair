@@ -26,6 +26,15 @@ Checks of a section
 - phi_minor = A_f / (pi minor^2 / 4): the value if the yarn is round and the
   long axis comes only from an oblique cut. Reported, not used by default.
 - An outline that crosses itself has no defined area and is rejected.
+
+Status of an outline (key "status" of a section)
+- "suggested": proposed by suggest_outline and not yet confirmed; such a
+  section is listed but left out of the mean.
+- "accepted": the suggestion confirmed unchanged by the user.
+- "edited": a suggestion whose points the user moved, added or removed.
+- "manual": drawn by the user.
+- "": no outline yet.
+The counts per label show how many suggestions needed correcting.
 """
 import json
 import math
@@ -35,6 +44,7 @@ from .packing import substance_area_um2, theoretical_diameter_um
 
 ASPECT_LIMIT = 1.3
 FORMAT = "yarnsection-outlines"
+STATUSES = ("", "suggested", "accepted", "edited", "manual")
 
 
 # ----------------------------------------------------------------- geometry
@@ -134,20 +144,28 @@ def _t975(df):
 
 
 def summarise(values, tex=None, density=None):
-    """Summary of the sections of one yarn (only those with use=True).
+    """Summary of the sections of one yarn (only those with use=True and not
+    pending, i.e. not an unconfirmed suggestion).
 
-    values: dicts from section_values (with an optional key "use").
-    Returns dict(n, n_flagged, phi_mean, phi_sd, phi_cv, phi_ci95, d_eq_mean,
-    d_eq_sd, aspect_mean, area_mean, phi_of_mean_area, d_theoretical) with
-    NaN where a value cannot be computed. phi_ci95 is the half-width of the
-    95 % confidence interval of the mean (t distribution). d_theoretical is the
-    diameter YarnHair calculates from count, density and phi_mean."""
+    values: dicts from section_values (with optional keys "use", "pending" and
+    "status"). Returns dict(n, n_flagged, phi_mean, phi_sd, phi_cv, phi_ci95,
+    d_eq_mean, d_eq_sd, aspect_mean, area_mean, phi_of_mean_area,
+    d_theoretical, n_pending, n_accepted, n_edited, n_manual) with NaN where a
+    value cannot be computed. phi_ci95 is the half-width of the 95 % confidence
+    interval of the mean (t distribution). d_theoretical is the diameter
+    YarnHair calculates from count, density and phi_mean. n_pending counts
+    unconfirmed suggestions; n_accepted, n_edited and n_manual count the used
+    sections by the origin of their outline."""
     nan = float("nan")
-    used = [v for v in values if v.get("use", True)]
+    used = [v for v in values if v.get("use", True) and not v.get("pending")]
     n = len(used)
     out = dict(n=n, n_flagged=sum(1 for v in used if v.get("flag")), phi_mean=nan, phi_sd=nan, phi_cv=nan,
                phi_ci95=nan, d_eq_mean=nan, d_eq_sd=nan, aspect_mean=nan, area_mean=nan,
-               phi_of_mean_area=nan, d_theoretical=nan)
+               phi_of_mean_area=nan, d_theoretical=nan,
+               n_pending=sum(1 for v in values if v.get("pending")),
+               n_accepted=sum(1 for v in used if v.get("status") == "accepted"),
+               n_edited=sum(1 for v in used if v.get("status") == "edited"),
+               n_manual=sum(1 for v in used if v.get("status", "manual") in ("manual", "")))
     if n == 0:
         return out
 
@@ -184,22 +202,44 @@ def _erode(m, r):
     return ndi.distance_transform_edt(m) > r
 
 
-def suggest_outline(gray, expected_diameter_px=None, n_points=48, max_side=1600):
+def _candidate_masks(g, dexp):
+    """Foreground masks tried for the suggestion, in order of preference.
+
+    texture: fibres seen by their edges (bright-field sections, where fibres and
+    embedding medium have about the same grey level): gradient magnitude,
+    smoothed over 1.5 % of the expected diameter, above its Otsu threshold.
+    bright / dark: fibres brighter or darker than the medium (fluorescence,
+    dark field, stained sections), Otsu threshold of the smoothed image."""
+    from skimage.filters import gaussian, sobel, threshold_otsu
+    tex = gaussian(sobel(gaussian(g, 1.0, preserve_range=True)), max(1.5, 0.015 * dexp), preserve_range=True)
+    yield 0, tex > threshold_otsu(tex)
+    gi = gaussian(g, 1.5, preserve_range=True)
+    t = threshold_otsu(gi)
+    yield 1, gi > t
+    yield 1, gi < t
+
+
+def suggest_outline(gray, expected_diameter_px=None, n_points=48, max_side=1000):
     """Suggest an outline of the yarn body on a cross-section image.
 
-    Smooths the image, splits it at the Otsu threshold, closes the gaps between
-    fibres (disk of 6 % of the expected diameter), fills holes and takes the
-    compact region that does not touch the image border and whose area is
-    closest to the expected area (else the largest). Both polarities are tried
-    (fibres brighter or darker than the embedding medium). Large images are
-    reduced to at most max_side pixels for this step. The contour is resampled
-    to n_points vertices equally spaced along it, starting at the top (few
-    points to edit; a circle comes out 0.3 % small with 48). Returns a list of
-    (x, y) vertices in pixels of the original image, or None. The result is only
-    a suggestion: the measurement is the outline the user accepts."""
+    Large images are first reduced to at most max_side pixels (block mean).
+    Foreground masks are made from the edges of the fibres (texture) and from
+    their grey level (both polarities), see _candidate_masks. Each mask is
+    closed with a disk of 6 % of the expected diameter (bridges the gaps between
+    fibres of the body), holes are filled (a lost core) and it is opened with
+    half that radius (removes loose single fibres). Candidates are compact
+    regions (solidity >= 0.7) that do not touch the image border and whose area
+    lies within 0.2-5 times the expected area. The largest candidate of the
+    texture mask is taken, else the largest of the grey-level masks; the
+    expected size sets only the scale and this plausibility range, so the
+    suggestion is not pulled towards the expected packing density. The region
+    is smoothed (Gaussian, sigma = closing radius) and its contour is resampled
+    to n_points vertices equally spaced along it, starting at the top. Returns a
+    list of (x, y) vertices in pixels of the original image, or None. The result
+    is only a suggestion: the measurement is the outline the user confirms."""
     import numpy as np
     from scipy import ndimage as ndi
-    from skimage.filters import gaussian, threshold_otsu
+    from skimage.filters import gaussian
     from skimage.measure import find_contours, regionprops
 
     g = np.asarray(gray, dtype=float)
@@ -211,42 +251,39 @@ def suggest_outline(gray, expected_diameter_px=None, n_points=48, max_side=1600)
         g = g[:h, :w].reshape(h // f, f, w // f, f).mean(axis=(1, 3))
     if g.max() - g.min() < 1e-9:
         return None
-    g = gaussian(g, sigma=1.5, preserve_range=True)
-    t = threshold_otsu(g)
     h, w = g.shape
     if expected_diameter_px:
         dexp = expected_diameter_px / f
-        r = max(2.0, 0.06 * dexp)
         a_exp = math.pi * dexp ** 2 / 4
     else:
-        r = max(2.0, 0.01 * min(h, w))
+        dexp = 0.5 * min(h, w)
         a_exp = None
+    r = max(2.0, 0.06 * dexp)
     pad = int(math.ceil(r)) + 2
-    best, best_score = None, -math.inf
-    for fg in (g > t, g < t):
+    best = None                                   # (priority, -area, mask)
+    for prio, fg in _candidate_masks(g, dexp):
+        if best is not None and best[0] < prio:
+            break
         m = np.pad(fg, pad)
         m = _erode(_dilate(m, r), r)                       # closing
         m = ndi.binary_fill_holes(m)
         m = _dilate(_erode(m, r / 2), r / 2)               # opening
         m = m[pad:-pad, pad:-pad]
-        lab, n = ndi.label(m)
+        lab, _ = ndi.label(m)
         for rp in regionprops(lab):
             r0, c0, r1, c1 = rp.bbox
             if r0 == 0 or c0 == 0 or r1 == h or c1 == w:
                 continue
             if rp.solidity < 0.7:
                 continue
-            if a_exp is not None:
-                if not 0.2 * a_exp < rp.area < 5 * a_exp:
-                    continue
-                score = -abs(math.log(rp.area / a_exp))
-            else:
-                score = rp.area
-            if score > best_score:
-                best, best_score = (lab == rp.label), score
+            if a_exp is not None and not 0.2 * a_exp < rp.area < 5 * a_exp:
+                continue
+            if best is None or (prio, -rp.area) < best[:2]:
+                best = (prio, -rp.area, lab == rp.label)
     if best is None:
         return None
-    cs = find_contours(np.pad(best, 1).astype(float), 0.5)
+    sm = gaussian(np.pad(best[2], pad).astype(float), r, preserve_range=True)[pad - 1:-(pad - 1), pad - 1:-(pad - 1)]
+    cs = find_contours(sm, 0.5)
     if not cs:
         return None
     c = np.asarray(max(cs, key=len), dtype=float)
@@ -262,13 +299,15 @@ def suggest_outline(gray, expected_diameter_px=None, n_points=48, max_side=1600)
     return pts if len(pts) >= 3 else None
 
 
-def synthetic_section(seed=1, radius=120, fibre_radius=6, size=600, bright=True):
-    """Test image: bright fibre discs packed at random inside a circle of the given
-    radius (pixels) on a dark background, or the reverse (bright=False)."""
+def synthetic_section(seed=1, radius=120, fibre_radius=6, size=600, bright=True, edges_only=False):
+    """Test image: fibre discs packed at random inside a circle of the given
+    radius (pixels). bright=True: bright fibres on a dark background, False:
+    the reverse. edges_only=True: as in bright-field sections, fibres differ
+    from the medium only by a dark rim (same grey level inside)."""
     import numpy as np
     rng = np.random.default_rng(seed)
     yy, xx = np.mgrid[:size, :size]
-    img = 40 + rng.normal(0, 3, (size, size))
+    img = (150 if edges_only else 40) + rng.normal(0, 3, (size, size))
     c = size / 2
     centres = []
     for _ in range(20000):
@@ -278,9 +317,13 @@ def synthetic_section(seed=1, radius=120, fibre_radius=6, size=600, bright=True)
         if all((x - u) ** 2 + (y - v) ** 2 >= (2 * fibre_radius + 1) ** 2 for u, v in centres):
             centres.append((x, y))
     for x, y in centres:
-        img[(xx - x) ** 2 + (yy - y) ** 2 <= fibre_radius ** 2] = 200
+        d2 = (xx - x) ** 2 + (yy - y) ** 2
+        if edges_only:
+            img[(d2 <= fibre_radius ** 2) & (d2 > (fibre_radius - 2) ** 2)] = 90
+        else:
+            img[d2 <= fibre_radius ** 2] = 200
     img = np.clip(img, 0, 255)
-    return img if bright else 255 - img
+    return img if (bright or edges_only) else 255 - img
 
 
 # ------------------------------------------------------------- outline files
@@ -322,24 +365,28 @@ def load_outlines(path):
             s["image"] = os.path.normpath(os.path.join(base, s["image"]))
         s["outline"] = [tuple(p) for p in s.get("outline", [])]
         s.setdefault("use", True)
+        if s.get("status") not in STATUSES:                 # files written before statuses existed
+            s["status"] = "manual" if len(s["outline"]) >= 3 else ""
     data.setdefault("yarns", {})
     return data
 
 
 SECTION_COLUMNS = ["label", "image", "use", "area_um2", "d_eq_um", "major_um", "minor_um", "aspect",
-                   "phi", "phi_minor", "flag", "error"]
+                   "phi", "phi_minor", "flag", "status", "error"]
 SUMMARY_COLUMNS = ["label", "n", "phi_mean", "phi_sd", "phi_ci95", "phi_cv", "phi_of_mean_area", "d_eq_mean",
-                   "d_eq_sd", "aspect_mean", "n_flagged", "d_theoretical"]
+                   "d_eq_sd", "aspect_mean", "n_flagged", "d_theoretical", "n_pending", "n_accepted", "n_edited",
+                   "n_manual"]
 
 
 def section_table(rows):
     """Rows of evaluate() as a table (header first); empty cells for sections
-    without an outline."""
+    without an outline. The status column says where the outline came from;
+    "suggested" sections are not in the summary."""
     out = [list(SECTION_COLUMNS)]
     for s, v, err in rows:
         v = v or {}
         out.append([s["label"], os.path.basename(s["image"]), int(bool(s.get("use", True)))]
-                   + [v.get(k, "") for k in SECTION_COLUMNS[3:-1]] + [err])
+                   + [v.get(k, "") for k in SECTION_COLUMNS[3:-2]] + [s.get("status", ""), err])
     return out
 
 
@@ -351,7 +398,8 @@ def summary_table(summary):
 
 
 def evaluate(project):
-    """Values of every outlined section and the summary per label.
+    """Values of every outlined section and the summary per label
+    (unconfirmed suggestions are left out of the summary).
 
     Returns (rows, summary): rows = list of (section, values or None, error);
     summary = {label: summarise(...)} in the order labels first appear."""
@@ -365,6 +413,8 @@ def evaluate(project):
             try:
                 v = section_values(s["outline"], px, tex, rho)
                 v["use"] = s.get("use", True)
+                v["status"] = s.get("status", "manual")
+                v["pending"] = v["status"] == "suggested"
             except ValueError as e:
                 err = str(e)
         rows.append((s, v, err))
