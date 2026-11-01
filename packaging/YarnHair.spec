@@ -2,7 +2,7 @@
 import sys
 from PyInstaller.utils.hooks import collect_all
 
-datas, binaries, hiddenimports = [], [], ["openpyxl"]
+datas, binaries, hiddenimports = [], [], ["openpyxl", "yarnhair.gui.section_window"]
 for pkg in ("skimage",):          # lazily loaded submodules and their .pyi stubs
     d, b, h = collect_all(pkg)
     datas += d; binaries += b; hiddenimports += h
