@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "YarnHair: rule-based measurement of yarn hairiness from microscope images"
+abstract: >-
+  YarnHair measures yarn hairiness (number of hairs, total protruding length and
+  tip-distance classes per 10 mm) from microscope images of a straight yarn
+  segment. Hairs are detected by their line shape with a ridge filter, and every
+  hair is traced back to the yarn body boundary, which is never narrower than the
+  theoretical yarn diameter. Graphical program and command-line interface in
+  English and Turkish.
+version: 1.0.0
+license: MIT
+authors:
+  - family-names: Erbil
+    given-names: Yılmaz
+    orcid: "https://orcid.org/0000-0001-7077-2733"
+    affiliation: "Çukurova University, Department of Textile Engineering"
+keywords:
+  - yarn hairiness
+  - image analysis
+  - textile testing
+  - microscopy

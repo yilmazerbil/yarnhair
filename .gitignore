@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+*.bmp
+*.tif
+*.tiff
+results*/
+overlays*/
+.pytest_cache/
+.DS_Store
